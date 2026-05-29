@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>스피드 메이플 — PROTOTYPE</title>
+<style>
+  :root{
+    --bg1:#fde68a;
+    --bg2:#bef264;
+    --ink:#1a1a1a;
+    --sub:#5a5048;
+    --wine:#AD0E37;
+    --red:#ffce3a;     /* 빛 */
+    --blue:#3a86ff;    /* 시간 */
+    --green:#3be07a;   /* 생명 */
+    --dark:#101018;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow:hidden;background:#fef9e7;font-family:-apple-system,'Pretendard',sans-serif;color:var(--ink);user-select:none;-webkit-tap-highlight-color:transparent;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  canvas{display:block;width:100%;height:100%;touch-action:none;}
+
+  /* HUD */
+  .hud{position:absolute;pointer-events:none;font-weight:600;}
+  #score{top:14px;left:14px;background:rgba(0,0,0,.6);color:#fff;padding:8px 14px;border-radius:10px;font-size:14px;line-height:1.3;}
+  #score b{font-size:22px;display:block;color:#ffe066;}
+  #combo{top:14px;left:50%;transform:translateX(-50%);padding:6px 18px;border-radius:24px;font-size:15px;color:#fff;background:linear-gradient(90deg,#ff7a18,#af002d);box-shadow:0 4px 14px rgba(175,0,45,.4);opacity:0;transition:opacity .2s,transform .2s;font-weight:700;}
+  #combo.show{opacity:1;}
+  #combo.pop{transform:translateX(-50%) scale(1.18);}
+  #speed{top:14px;right:14px;background:rgba(0,0,0,.6);color:#fff;padding:8px 14px;border-radius:10px;font-size:13px;text-align:right;line-height:1.3;}
+  #speed b{font-size:20px;display:block;color:#7df9ff;}
+  #lives{position:absolute;bottom:14px;right:14px;display:flex;gap:6px;}
+  .heart{width:22px;height:22px;background:#ff3b4e;clip-path:path('M11 20.5l-1.6-1.5C4.2 14.5 1 11.6 1 8 1 5.2 3.2 3 6 3c1.5 0 3 .7 4 1.8C11 3.7 12.5 3 14 3c2.8 0 5 2.2 5 5 0 3.6-3.2 6.5-8.4 11L11 20.5z');}
+  .heart.off{background:#444;opacity:.4;}
+  /* 색 pip */
+  #pips{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px;}
+  .pip{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;border:2px solid rgba(255,255,255,.2);box-shadow:0 4px 10px rgba(0,0,0,.2);transition:transform .12s,border-color .12s;}
+  .pip[data-c="red"]{background:radial-gradient(circle at 35% 30%,#fff0b0,var(--red));}
+  .pip[data-c="blue"]{background:radial-gradient(circle at 35% 30%,#a9c8ff,var(--blue));}
+  .pip[data-c="green"]{background:radial-gradient(circle at 35% 30%,#a9f3c5,var(--green));}
+  .pip.active{transform:translateY(-4px) scale(1.12);border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.6),0 6px 16px rgba(0,0,0,.3);}
+
+  /* 모바일 버튼 */
+  .zone{position:absolute;display:none;align-items:center;justify-content:center;color:rgba(255,255,255,.4);font-size:11px;font-weight:700;pointer-events:auto;}
+  #mJump{right:0;top:0;width:50%;height:50%;}
+  #mSlide{right:0;bottom:0;width:50%;height:50%;}
+  #mColor{left:0;top:0;width:50%;height:100%;}
+  @media(hover:none){.zone{display:flex;}}
+
+  /* 시작/오버 */
+  .panel{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 30%,#fde68a,#fed7aa 70%,#fdba74);padding:24px;text-align:center;}
+  .panel.hidden{display:none;}
+  .panel h1{font-size:46px;color:var(--wine);font-weight:900;letter-spacing:-1px;line-height:1;}
+  .panel h1 small{display:block;font-size:18px;color:var(--ink);font-weight:700;margin-top:8px;}
+  .panel .sub{margin-top:10px;color:var(--sub);font-size:14px;}
+  .rulecard{display:flex;gap:14px;margin:24px 0 14px;flex-wrap:wrap;justify-content:center;max-width:760px;}
+  .rule{background:#fffbeb;border:2px solid #fcd34d;border-radius:14px;padding:14px 16px;width:200px;}
+  .rule h4{color:var(--wine);font-size:15px;margin-bottom:6px;}
+  .rule p{font-size:12.5px;color:var(--ink);line-height:1.5;}
+  .keyhint{margin-top:8px;font-size:13px;color:var(--sub);max-width:600px;line-height:1.7;}
+  .keyhint kbd{display:inline-block;padding:2px 7px;border-radius:5px;background:#fff;border:1px solid #ddd;font-family:monospace;font-size:11px;color:#333;box-shadow:0 1px 0 #ccc;}
+  .btn{margin-top:22px;padding:14px 40px;background:linear-gradient(180deg,#ff7a18,#af002d);color:#fff;border:none;border-radius:30px;font-size:18px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(175,0,45,.4);letter-spacing:2px;}
+  .btn:active{transform:translateY(2px);}
+
+  /* 큰 콤보 텍스트 */
+  #bigText{position:absolute;left:50%;top:35%;transform:translate(-50%,-50%);font-size:60px;font-weight:900;color:#fff;text-shadow:0 4px 20px rgba(0,0,0,.4),0 0 30px var(--wine);opacity:0;pointer-events:none;letter-spacing:-2px;}
+
+  /* === 관리자 패널 === */
+  #adminBtn{position:absolute;top:14px;right:140px;width:34px;height:34px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:50;}
+  #adminBtn:hover{background:rgba(0,0,0,.75);}
+  #adminPanel{position:absolute;top:0;right:0;width:340px;height:100%;background:rgba(20,16,28,.96);color:#fff;font-size:12px;padding:14px 18px;overflow-y:auto;z-index:100;transform:translateX(100%);transition:transform .25s;box-shadow:-8px 0 20px rgba(0,0,0,.4);}
+  #adminPanel.open{transform:translateX(0);}
+  #adminPanel h3{font-size:15px;color:var(--wine);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #555;display:flex;justify-content:space-between;align-items:center;}
+  #adminPanel h4{font-size:12px;color:#fbbf24;margin:14px 0 6px;letter-spacing:.5px;}
+  #adminPanel .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:11px;}
+  #adminPanel .row label{flex:1;color:#ccc;}
+  #adminPanel .row input[type="range"]{flex:1.4;margin:0 8px;height:4px;}
+  #adminPanel .row .val{width:48px;text-align:right;color:#7df9ff;font-family:monospace;font-size:11px;}
+  #adminPanel .btnRow{display:flex;gap:6px;margin-top:14px;}
+  #adminPanel .smbtn{flex:1;padding:6px;background:#333;color:#fff;border:1px solid #555;border-radius:5px;cursor:pointer;font-size:11px;}
+  #adminPanel .smbtn:hover{background:#444;}
+  #adminPanel .smbtn.reset{background:#7E0A28;border-color:#AD0E37;}
+  #adminPanel .close{background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;}
+  #adminPanel .hint{font-size:10px;color:#888;margin-top:10px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <div class="hud" id="score">SCORE<b id="scoreNum">0</b></div>
+  <div class="hud" id="combo">콤보 ×1</div>
+  <div class="hud" id="speed">SPD ×1.0<b id="killNum">0</b>KILLS</div>
+  <div class="hud" id="lives"><div class="heart"></div><div class="heart"></div><div class="heart"></div></div>
+
+  <div id="pips">
+    <div class="pip active" data-c="red">1</div>
+    <div class="pip" data-c="blue">2</div>
+    <div class="pip" data-c="green">3</div>
+  </div>
+
+  <div class="zone" id="mJump">↑ 점프</div>
+  <div class="zone" id="mSlide">▼ 슬라이드</div>
+  <div class="zone" id="mColor">← 색 전환</div>
+
+  <div id="bigText"></div>
+
+  <!-- 관리자 패널 -->
+  <button id="adminBtn" title="관리자 설정 (/ 키)">⚙</button>
+  <div id="adminPanel">
+    <h3>관리자 설정 <button class="close" id="adminClose">×</button></h3>
+    <div id="adminBody"></div>
+    <div class="btnRow">
+      <button class="smbtn reset" id="adminReset">기본값 복원</button>
+      <button class="smbtn" id="adminRestart">재시작</button>
+    </div>
+    <div class="hint">변경 즉시 반영. <b>/</b> 키로 토글. 재시작은 게임 처음부터.</div>
+  </div>
+
+  <!-- 시작 -->
+  <div class="panel" id="startScreen">
+    <h1>스피드 메이플<small>SPEED MAPLE  ·  패링 사냥 런  ·  PROTOTYPE</small></h1>
+    <div class="sub">색을 맞춰 음파를 쏘고, 사냥할수록 빨라진다.</div>
+    <div class="rulecard">
+      <div class="rule">
+        <h4>색 = 사냥</h4>
+        <p>색 장애물을 같은 색으로 패링 → <b>원형 음파</b> 발사. 주변 몹이 한 번에 쓸려나간다.</p>
+      </div>
+      <div class="rule">
+        <h4>사냥 = 성장</h4>
+        <p>몹을 처치할수록 <b>이동속도</b>와 <b>음파 위력</b>이 점점 누적된다.</p>
+      </div>
+      <div class="rule">
+        <h4>흑색 = 회피</h4>
+        <p>검은 장애물은 음파 불가. <b>점프/슬라이드로 피하라.</b> 음파 콤보가 끊긴다.</p>
+      </div>
+      <div class="rule">
+        <h4>보스전 = 스킬</h4>
+        <p>일정 킬 도달 시 보스 등장. 패링으로 <b>스킬 게이지</b>를 채워 발동 → 큰 데미지!</p>
+      </div>
+    </div>
+    <div class="keyhint">
+      PC : <kbd>Space</kbd> 점프 · <kbd>↓</kbd> 슬라이드(홀드) · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> 색 전환<br>
+      모바일 : 오른쪽 위=점프 · 오른쪽 아래=슬라이드 · 왼쪽=색 전환
+    </div>
+    <button class="btn" id="startBtn">출 발</button>
+  </div>
+
+  <!-- 게임 오버 -->
+  <div class="panel hidden" id="overScreen" style="background:radial-gradient(ellipse at 50% 30%,#fff,#fed7aa);">
+    <h1 style="font-size:38px;">사냥 종료</h1>
+    <div class="sub" style="margin-top:18px;font-size:16px;">최종 점수 <b style="color:var(--wine);font-size:28px;" id="finalScore">0</b></div>
+    <div class="sub" style="font-size:13px;">처치 <span id="finalKills">0</span> · 최고 콤보 <span id="finalCombo">0</span> · 최대 속도 ×<span id="finalSpeed">1.0</span></div>
+    <button class="btn" id="restartBtn">다시 출발</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ---------- 캔버스 ----------
+const cvs = document.getElementById('game');
+const ctx = cvs.getContext('2d');
+let VW=0, VH=0, DPR=1;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  VW = window.innerWidth; VH = window.innerHeight;
+  cvs.width = VW*DPR; cvs.height = VH*DPR;
+  cvs.style.width = VW+'px'; cvs.style.height = VH+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+resize(); window.addEventListener('resize', resize);
+
+// ---------- 상태 ----------
+let state='menu';   // menu / run / over
+let frame=0;
+
+// ---------- 관리자 설정 (CONFIG) ----------
+// 모든 조정 가능한 수치는 여기서 관리. 슬라이더로 실시간 변경됨.
+const DEFAULT_CONFIG = {
+  baseSpeed: 5.0,           // 기본 이동 속도
+  speedGainPerKill: 0.012,  // 처치당 속도 증가량
+  maxSpeed: 3.6,            // 속도 누적 상한
+  waveBaseSize: 0.04,       // 음파 시작 크기 (VW 비율)
+  waveMaxSize: 0.18,        // 음파 최대 크기 (VW 비율)
+  waveLvlPerKill: 12,       // N킬마다 음파 위력 +1 (작을수록 빨리 강해짐)
+  waveThickness: 0.012,     // 음파 두께 (VW 비율)
+  jumpPower: 0.0145,        // 점프 힘 (VW 비율)
+  gravity: 0.00095,         // 중력 (VW 비율)
+  obstacleSpawnMin: 28,     // 장애물 최소 스폰 간격 (프레임)
+  obstacleSpawnMax: 70,     // 장애물 최대 스폰 간격
+  mobSpawnMin: 14,          // 몹 최소 스폰 간격
+  mobSpawnMax: 32,          // 몹 최대 스폰 간격
+  blackRatio: 0.35,         // 흑색 장애물 기본 비율
+  bossTrigger1: 50,         // 첫 보스 트리거 킬 수
+  bossHpMul: 1.0,           // 보스 HP 배율
+  maxJumps: 2,              // 더블 점프 허용 횟수
+};
+let CONFIG = Object.assign({}, DEFAULT_CONFIG);
+
+let score=0, lives=3, kills=0, combo=0, maxCombo=0, maxSpeed=1;
+let speedMul = 1.0;  // 사냥 누적으로 증가
+let waveLvl = 0;     // 음파 위력 레벨 (B→A 진화)
+
+// ---------- 보스전 ----------
+let boss = null;           // 현재 등장한 보스 (없으면 null)
+let bossesDefeated = 0;    // 처치한 보스 수
+let runEnding = false;     // 구간 종료 신호 (스폰 멈춤)
+let bossIntro = 0;         // 보스 진입 페이드/연출 카운트(프레임). >0 동안은 입력 받되 스폰 정지
+let BOSS_TRIGGERS = [50, 120, 220, 360, 550]; // 보스 등장 킬 임계값 (관리자 첫 값 조정 가능)
+function syncBossTriggers(){
+  // 첫 보스 트리거 + 비례 증가
+  const t1 = CONFIG.bossTrigger1;
+  BOSS_TRIGGERS = [t1, t1*2.4, t1*4.4, t1*7.2, t1*11].map(n=> Math.round(n));
+}
+let nextBossIdx = 0;
+const BOSS_NAMES = [
+  { name:'주황버섯 대왕', color:'#ff8c42', hp:35 },
+  { name:'거대 슬라임',   color:'#7dd3fc', hp:55 },
+  { name:'펌킨 자쿰',     color:'#fb923c', hp:80 },
+  { name:'혼테일 그림자', color:'#a78bfa', hp:115 },
+  { name:'검은마법사',    color:'#1a1a2e', hp:160 },
+];
+let bossBullets = [];      // 보스가 쏘는 색 탄
+let bossWalls = [];        // 보스 색 벽 (낙하)
+let bossFloors = [];       // 보스 바닥 장판
+
+// ---------- 색 ----------
+const COLORS = { red:'#ffce3a', blue:'#3a86ff', green:'#3be07a' };
+const COLOR_KEYS = ['red','blue','green'];
+let activeColor = 'red';
+
+function setColor(c){
+  if(activeColor === c) return;
+  activeColor = c;
+  document.querySelectorAll('.pip').forEach(p=>p.classList.toggle('active', p.dataset.c===c));
+}
+function cycleColor(dir){
+  let i = COLOR_KEYS.indexOf(activeColor);
+  i = (i+dir+3)%3;
+  setColor(COLOR_KEYS[i]);
+}
+
+// ---------- 플레이어 ----------
+const groundYRatio = 0.78;
+function groundY(){ return VH*groundYRatio; }
+let player;
+function resetPlayer(){
+  const s = Math.max(28, VW*0.04);
+  player = {
+    x: VW*0.22, y: 0, w: s, h: s, baseH: s,
+    vy:0, onGround:false, jumps:0, maxJumps:CONFIG.maxJumps,
+    invuln:0
+  };
+  player.y = groundY() - player.h;
+}
+
+// ---------- 객체 풀 ----------
+let obstacles=[];  // 색 장애물 + 흑색 장애물
+let mobs=[];       // 떠다니는 메이플 몹
+let waves=[];      // 음파
+let particles=[];
+let floats=[];     // +1 점수 표시
+let killStreak=[]; // 처치한 몹의 임팩트
+
+// 색 장애물 (사용자 패링 대상)
+function spawnColorObs(){
+  const c = COLOR_KEYS[(Math.random()*3)|0];
+  const h = VW*0.06 + Math.random()*VW*0.04;
+  obstacles.push({
+    type:'color', color:c,
+    x: VW+30, y: groundY()-h, w: VW*0.032, h:h,
+  });
+}
+// 흑색 장애물 (지상 가시) — 점프 회피
+function spawnSpike(){
+  const h = VW*0.045;
+  obstacles.push({
+    type:'spike',
+    x: VW+30, y: groundY()-h, w: VW*0.034, h:h,
+  });
+}
+// 흑색 장애물 (공중) — 슬라이드 회피
+function spawnAir(){
+  const w = VW*0.06, h = VW*0.04;
+  obstacles.push({
+    type:'air',
+    x: VW+30, y: groundY()-VW*0.10, w:w, h:h,
+  });
+}
+
+// 떠다니는 메이플 몹 (배경 사냥감)
+const MOB_TYPES = [
+  { name:'주황버섯', color:'#ff8c42', size:0.038 },
+  { name:'슬라임',   color:'#7dd3fc', size:0.040 },
+  { name:'달팽이',   color:'#fbbf24', size:0.034 },
+  { name:'스텀프',   color:'#a78bfa', size:0.036 },
+  { name:'리본돼지', color:'#f9a8d4', size:0.040 },
+];
+function spawnMob(){
+  const t = MOB_TYPES[(Math.random()*MOB_TYPES.length)|0];
+  const s = VW*t.size;
+  // 떠다니는 높이 분포
+  const layer = Math.random();
+  let y;
+  if(layer < 0.5) y = groundY() - s - Math.random()*VW*0.02;      // 지면 근처
+  else if(layer < 0.85) y = groundY() - VW*0.12 - Math.random()*VW*0.05; // 중간 공중
+  else y = groundY() - VW*0.20 - Math.random()*VW*0.04;            // 높은 공중
+  mobs.push({
+    x: VW+30, y, w:s, h:s,
+    color:t.color, name:t.name,
+    bob: Math.random()*Math.PI*2,
+    vy: 0,
+  });
+}
+
+// 음파
+function emitWave(x, y, color){
+  const r0 = VW * CONFIG.waveBaseSize;
+  const rMax = VW * CONFIG.waveMaxSize + waveLvl*VW*0.03;
+  waves.push({ x, y, r:r0, rMax, color, life:1, born:frame });
+}
+
+// 파티클
+function addParticles(x,y,color,n=6,sp=3){
+  for(let i=0;i<n;i++){
+    particles.push({
+      x, y, vx:(Math.random()-0.5)*sp, vy:(Math.random()-0.5)*sp-1,
+      life:1, color
+    });
+  }
+}
+// 떠오르는 점수 텍스트
+function addFloat(x,y,txt,color='#ffd24a'){
+  floats.push({x,y,txt,color,life:1});
+}
+
+// ---------- 입력 ----------
+let slideHeld = false;
+function jump(){
+  if((state!=='run' && state!=='boss') || !player) return;
+  if(player.jumps < player.maxJumps){
+    player.vy = -VW*CONFIG.jumpPower;
+    player.jumps++;
+    player.onGround=false;
+    addParticles(player.x, player.y+player.h, '#ffffff', 5, 2.5);
+  }
+}
+function slideStart(){ if(state==='run' || state==='boss') slideHeld = true; }
+function slideRelease(){ slideHeld = false; }
+
+window.addEventListener('keydown', e=>{
+  if(e.code==='ArrowDown'||e.code==='KeyS'){ e.preventDefault(); slideStart(); return; }
+  if(e.repeat) return;
+  if(e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW'){ e.preventDefault(); jump(); }
+  if(e.code==='Digit1') setColor('red');
+  if(e.code==='Digit2') setColor('blue');
+  if(e.code==='Digit3') setColor('green');
+  if(e.code==='KeyA') cycleColor(-1);
+  if(e.code==='KeyD') cycleColor(1);
+});
+window.addEventListener('keyup', e=>{
+  if(e.code==='ArrowDown'||e.code==='KeyS'){ e.preventDefault(); slideRelease(); }
+});
+
+// 터치
+const mJump = document.getElementById('mJump');
+const mSlide = document.getElementById('mSlide');
+const mColor = document.getElementById('mColor');
+mJump.addEventListener('touchstart', e=>{ e.preventDefault(); jump(); }, {passive:false});
+mSlide.addEventListener('touchstart', e=>{ e.preventDefault(); slideStart(); }, {passive:false});
+mSlide.addEventListener('touchend', e=>{ e.preventDefault(); slideRelease(); }, {passive:false});
+mSlide.addEventListener('touchcancel', e=>{ slideRelease(); }, {passive:false});
+mColor.addEventListener('touchstart', e=>{ e.preventDefault(); cycleColor(1); }, {passive:false});
+mJump.addEventListener('mousedown', ()=> jump());
+mSlide.addEventListener('mousedown', ()=> slideStart());
+mSlide.addEventListener('mouseup', ()=> slideRelease());
+mSlide.addEventListener('mouseleave', ()=> slideRelease());
+mColor.addEventListener('mousedown', ()=> cycleColor(1));
+
+// ---------- 스폰 타이머 ----------
+let spawnTimerObs = 0;
+let spawnTimerMob = 0;
+function spawnLogic(dt){
+  // 구간 종료 중이면 새 장애물·몹 안 만듦 (남은 것만 흘러나감)
+  if(runEnding) return;
+  spawnTimerObs -= dt;
+  if(spawnTimerObs <= 0){
+    // 후반엔 색 장애물 위주(폭격), 초반은 흑색·색 비율 균형
+    const r = Math.random();
+    const blackRatio = Math.max(0.05, CONFIG.blackRatio - speedMul*0.05); // 빨라질수록 흑색 비율↓
+    if(r < blackRatio){
+      if(Math.random() < 0.55) spawnSpike();
+      else spawnAir();
+    } else {
+      spawnColorObs();
+    }
+    // 빠를수록 더 자주 (현재 속도에 반비례)
+    spawnTimerObs = Math.max(CONFIG.obstacleSpawnMin, CONFIG.obstacleSpawnMax - speedMul*8);
+  }
+  spawnTimerMob -= dt;
+  if(spawnTimerMob <= 0){
+    spawnMob();
+    spawnTimerMob = Math.max(CONFIG.mobSpawnMin, CONFIG.mobSpawnMax - speedMul*4); // 후반엔 몹 더 많이
+  }
+}
+
+// ---------- 물리 ----------
+function updatePlayer(dt){
+  if(!player) return;
+  const gy = groundY();
+  const grav = VW*CONFIG.gravity;
+
+  // footY 기준 (떨림 방지)
+  let footY = player.y + player.h;
+  player.vy += grav*dt;
+  footY += player.vy*dt;
+
+  let grounded=false;
+  if(footY >= gy){ footY = gy; player.vy=0; grounded=true; player.jumps=0; }
+  player.onGround = grounded;
+
+  const isSliding = slideHeld && grounded;
+  player.h = isSliding ? player.baseH*0.5 : player.baseH;
+  player.y = footY - player.h;
+
+  if(player.invuln>0) player.invuln -= dt;
+}
+
+// ---------- 충돌·로직 ----------
+function rectHit(a,b){
+  return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+}
+
+function updateObstacles(dt){
+  // 평지: 누적 속도 / 보스전: 일정 속도(긴장감 유지하되 폭주 X)
+  const v = (state === 'boss')
+    ? CONFIG.baseSpeed * (1.3 + speedMul*0.2) * dt  // 보스전: 살짝 빠른 고정 속도
+    : CONFIG.baseSpeed * speedMul * dt;
+  for(let i=obstacles.length-1;i>=0;i--){
+    const o = obstacles[i];
+    o.x -= v;
+    if(o.x + o.w < -30){ obstacles.splice(i,1); continue; }
+
+    // 플레이어 충돌
+    if(player.invuln<=0 && rectHit(o, player)){
+      if(o.type === 'color'){
+        if(o.color === activeColor){
+          // 패링 성공! 음파 발사
+          emitWave(player.x + player.w/2, player.y + player.h/2, o.color);
+          // 처치 보너스/콤보는 음파-몹 충돌에서 처리
+          combo += 1;
+          maxCombo = Math.max(maxCombo, combo);
+          showCombo();
+          addParticles(o.x+o.w/2, o.y+o.h/2, COLORS[o.color], 12, 4);
+          obstacles.splice(i,1);
+          continue;
+        } else {
+          // 색 불일치 = 피격
+          hit();
+        }
+      } else {
+        // 흑색 (점프/슬라이드 회피 대상) — 부딪히면 피격
+        hit();
+      }
+    }
+  }
+}
+
+function updateMobs(dt){
+  const v = CONFIG.baseSpeed * speedMul * dt * 0.8; // 몹은 좀 천천히
+  for(let i=mobs.length-1;i>=0;i--){
+    const m = mobs[i];
+    m.x -= v;
+    m.bob += 0.08*dt;
+    if(m.x + m.w < -30){ mobs.splice(i,1); continue; }
+  }
+}
+
+function updateWaves(dt){
+  for(let i=waves.length-1;i>=0;i--){
+    const w = waves[i];
+    const expandRate = (w.rMax - VW*0.04) / 16; // ~16 프레임 안에 최대
+    w.r += expandRate*dt;
+    w.life = 1 - (w.r - VW*0.04)/(w.rMax - VW*0.04);
+    if(w.r >= w.rMax){ waves.splice(i,1); continue; }
+
+    // 몹과 충돌 체크 (아직 안 죽은 것만)
+    for(let j=mobs.length-1;j>=0;j--){
+      const m = mobs[j];
+      const cx = m.x + m.w/2, cy = m.y + m.h/2;
+      const dx = cx - w.x, dy = cy - w.y;
+      const d = Math.hypot(dx, dy);
+      if(d < w.r && d > w.r - VW*0.06){ // 음파 링과 겹침
+        // 처치!
+        killMob(j, w.color);
+      }
+    }
+  }
+}
+
+function killMob(idx, color){
+  const m = mobs[idx];
+  if(!m) return;
+  kills++;
+  const gain = 10 + Math.floor(combo*1.5);
+  score += gain;
+  // 속도 누적 (CONFIG로 조정 가능)
+  speedMul = Math.min(CONFIG.maxSpeed, speedMul + CONFIG.speedGainPerKill);
+  maxSpeed = Math.max(maxSpeed, speedMul);
+  // 음파 위력 누적
+  waveLvl = Math.min(8, kills / CONFIG.waveLvlPerKill);
+
+  addParticles(m.x+m.w/2, m.y+m.h/2, m.color, 10, 4);
+  addParticles(m.x+m.w/2, m.y+m.h/2, color, 6, 5);
+  addFloat(m.x+m.w/2, m.y, '+'+gain);
+  mobs.splice(idx,1);
+
+  // 큰 콤보 모먼트
+  if(kills>0 && kills%25===0) bigText('×'+(kills/25+1).toFixed(0)+' WAVE');
+
+  // 보스 등장 트리거 체크
+  if(state==='run' && nextBossIdx < BOSS_TRIGGERS.length && kills >= BOSS_TRIGGERS[nextBossIdx]){
+    triggerBoss();
+  }
+}
+
+// ---------- 보스전 함수 ----------
+// 단계 1 : 킬 임계값 도달 → 구간 종료 시작 (새 장애물·몹 안 만듦, 화면이 비길 기다림)
+function triggerBoss(){
+  if(runEnding || boss) return;
+  runEnding = true;
+  bigText('구간 종료');
+}
+// 단계 2 : 화면이 거의 비면 → 보스 진입 연출(페이드 + 자막) 시작
+function startBossIntro(){
+  bossIntro = 90; // 1.5초 페이드/자막
+  const nextName = (BOSS_NAMES[nextBossIdx] || BOSS_NAMES[BOSS_NAMES.length-1]).name;
+  bigText('보스 출현 ─ ' + nextName);
+}
+function spawnBoss(){
+  const info = BOSS_NAMES[nextBossIdx] || BOSS_NAMES[BOSS_NAMES.length-1];
+  const hpScaled = Math.round(info.hp * (1 + speedMul*0.15) * CONFIG.bossHpMul);
+  boss = {
+    name: info.name, color: info.color,
+    x: VW*0.78, y: groundY()-VW*0.20,
+    w: VW*0.16, h: VW*0.16,
+    hp: hpScaled, maxHp: hpScaled,
+    bob: 0,
+    enterAnim: 1,
+    patternTimer: 60,
+    currentPattern: null,
+    patternPhase: 0,
+    fadeIn: 1,
+    skillGauge: 0,       // 0 ~ 100, 패링 성공으로 충전
+    skillCasting: 0,     // 스킬 발동 중 카운트 (프레임)
+  };
+  obstacles = [];
+  mobs = [];
+  bossBullets = [];
+  bossWalls = [];
+  bossFloors = [];
+  state = 'boss';
+}
+function endBoss(victory){
+  if(victory){
+    bossesDefeated++;
+    const reward = 200 + bossesDefeated*100;
+    score += reward;
+    bigText('보스 격파! +' + reward);
+    // 격파 보상: 속도·음파 위력 약간 상승
+    speedMul = Math.min(3.6, speedMul + 0.15);
+    waveLvl = Math.min(8, waveLvl + 0.5);
+    nextBossIdx++;
+  }
+  boss = null;
+  bossBullets = [];
+  bossWalls = [];
+  bossFloors = [];
+  obstacles = [];   // 보스 패턴으로 던진 흑색 장애물도 정리
+  state = 'run';
+}
+
+// ---------- 스킬 게이지 ----------
+function chargeSkillGauge(amount){
+  if(!boss || boss.skillCasting > 0) return;
+  boss.skillGauge = Math.min(100, boss.skillGauge + amount);
+  if(boss.skillGauge >= 100){
+    castSkill();
+  }
+}
+function castSkill(){
+  if(!boss) return;
+  boss.skillCasting = 80; // 약 1.3초 발동 연출
+  boss.skillGauge = 0;
+  // 발동 임팩트: 보스에게 큰 데미지 + 화려한 이펙트
+  const dmg = 25 + Math.floor(waveLvl*2) + Math.floor(speedMul*3);
+  boss.hp -= dmg;
+  bigText(getSkillName());
+  addFloat(boss.x + boss.w/2, boss.y + boss.h*0.3, '-'+dmg+'!', '#ffe066');
+  // 큰 폭발 파티클
+  const c = COLORS[activeColor];
+  for(let i=0;i<40;i++){
+    const a = (i/40) * Math.PI*2;
+    const sp = 6 + Math.random()*4;
+    particles.push({
+      x: boss.x + boss.w/2, y: boss.y + boss.h/2,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 1,
+      life: 1.5, color: c
+    });
+  }
+  // 발동 음파 (큰 거)
+  emitWave(player.x + player.w/2, player.y + player.h/2, activeColor);
+  emitWave(boss.x + boss.w/2, boss.y + boss.h/2, activeColor);
+  // 보스 HP 0 체크
+  if(boss.hp <= 0){ endBoss(true); return; }
+}
+function getSkillName(){
+  // 활성 색에 따라 스킬 이름 (테스트용 — 실제론 직업별 스킬로 확장)
+  const names = {
+    red: '☀ 빛의 심판!',
+    blue: '⏳ 시간 정지!',
+    green: '✦ 생명의 폭주!'
+  };
+  return names[activeColor] || '스킬 발동!';
+}
+
+function updateBoss(dt){
+  if(!boss) return;
+  // 보스룸 페이드 인
+  if(boss.fadeIn > 0){ boss.fadeIn -= 0.025*dt; if(boss.fadeIn < 0) boss.fadeIn = 0; }
+  // 등장 애니메이션
+  if(boss.enterAnim > 0){
+    boss.enterAnim -= 0.02*dt;
+    if(boss.enterAnim < 0) boss.enterAnim = 0;
+  }
+  boss.bob += 0.06*dt;
+
+  // 페이드 인 끝나기 전엔 패턴 안 굴림
+  if(boss.fadeIn > 0.3) return;
+
+  // 스킬 발동 중이면 패턴 정지 (탄 업데이트만)
+  if(boss.skillCasting > 0){
+    boss.skillCasting -= dt;
+    if(boss.skillCasting < 0) boss.skillCasting = 0;
+    updateBossBullets(dt);
+    return;
+  }
+
+  // 패턴 타이머
+  boss.patternTimer -= dt;
+  if(boss.patternTimer <= 0){
+    // 다음 패턴 선택 (6종 순환 + 약간 랜덤)
+    const patterns = ['shoot','wall','floor','fan','spike','air'];
+    boss.currentPattern = patterns[(Math.random()*patterns.length)|0];
+    boss.patternPhase = 0;
+    // 패턴별 지속시간
+    const durations = { shoot:140, wall:120, floor:100, fan:70, spike:120, air:120 };
+    boss.patternTimer = durations[boss.currentPattern] || 100;
+    // 패턴 알림 (작게)
+    const labels = {
+      shoot:'콩알탄!', wall:'색 벽 낙하!', floor:'바닥 장판!', fan:'부채꼴 탄막!',
+      spike:'가시 솟아오름! (점프)', air:'어둠 덩어리! (슬라이드)'
+    };
+    addFloat(boss.x + boss.w/2, boss.y - 12, labels[boss.currentPattern], '#ffe066');
+  }
+
+  // 패턴 실행
+  if(boss.currentPattern === 'shoot') patternShoot(dt);
+  else if(boss.currentPattern === 'wall') patternWall(dt);
+  else if(boss.currentPattern === 'floor') patternFloor(dt);
+  else if(boss.currentPattern === 'fan') patternFan(dt);
+  else if(boss.currentPattern === 'spike') patternSpike(dt);
+  else if(boss.currentPattern === 'air') patternAir(dt);
+
+  // 탄 업데이트 (충돌)
+  updateBossBullets(dt);
+  // 벽 업데이트
+  updateBossWalls(dt);
+  // 장판 업데이트
+  updateBossFloors(dt);
+}
+
+// 패턴 1 : 콩알탄 (플레이어 조준)
+function patternShoot(dt){
+  boss.patternPhase += dt;
+  if(boss.patternPhase >= Math.max(14, 28 - speedMul*4)){
+    boss.patternPhase = 0;
+    const c = COLOR_KEYS[(Math.random()*3)|0];
+    fireBullet(c);
+  }
+}
+function fireBullet(c){
+  const cx = boss.x + boss.w/2, cy = boss.y + boss.h/2;
+  const tx = player.x + player.w/2, ty = player.y + player.h/2;
+  const dx = tx - cx, dy = ty - cy;
+  const d = Math.hypot(dx,dy) || 1;
+  const sp = VW*0.008 * (1 + speedMul*0.15);
+  bossBullets.push({ x:cx, y:cy, vx:dx/d*sp, vy:dy/d*sp, r:VW*0.022, color:c });
+}
+
+// 패턴 2 : 색 벽 낙하 (위에서 떨어져 옆으로 밀려옴)
+function patternWall(dt){
+  boss.patternPhase += dt;
+  if(boss.patternPhase >= 28){
+    boss.patternPhase = 0;
+    const c = COLOR_KEYS[(Math.random()*3)|0];
+    bossWalls.push({
+      x: VW*0.95, y: -VW*0.15,
+      w: VW*0.04, h: VW*0.18,
+      vy: VW*0.012,  // 떨어지는 속도
+      vx: 0,
+      color: c,
+      grounded: false
+    });
+  }
+}
+function updateBossWalls(dt){
+  for(let i=bossWalls.length-1;i>=0;i--){
+    const w = bossWalls[i];
+    if(!w.grounded){
+      w.y += w.vy * dt;
+      if(w.y + w.h >= groundY()){
+        w.y = groundY() - w.h;
+        w.grounded = true;
+        w.vx = -VW*0.009 * (1 + speedMul*0.1); // 착지 후 왼쪽으로 밀려옴
+        addParticles(w.x+w.w/2, w.y+w.h, '#fff', 8, 3);
+      }
+    } else {
+      w.x += w.vx * dt;
+    }
+    if(w.x + w.w < -50){ bossWalls.splice(i,1); continue; }
+
+    // 플레이어 충돌
+    if(player.invuln <= 0 && rectHit(w, player)){
+      if(w.color === activeColor){
+        // 공명 통과 → 보스에 데미지
+        const dmg = 3 + Math.floor(waveLvl) + Math.floor(speedMul);
+        boss.hp -= dmg;
+        score += 20;
+        combo++; maxCombo = Math.max(maxCombo, combo); showCombo();
+        chargeSkillGauge(20);
+        emitWave(player.x+player.w/2, player.y+player.h/2, w.color);
+        addFloat(boss.x+boss.w/2, boss.y+boss.h*0.3, '-'+dmg, '#ffe066');
+        addParticles(w.x+w.w/2, w.y+w.h/2, COLORS[w.color], 14, 4);
+        bossWalls.splice(i,1);
+        if(boss.hp <= 0){ endBoss(true); return; }
+        continue;
+      } else {
+        hit();
+        addParticles(w.x+w.w/2, w.y+w.h/2, '#ff3b4e', 12, 4);
+        bossWalls.splice(i,1);
+        continue;
+      }
+    }
+  }
+}
+
+// 패턴 3 : 바닥 색 장판 (경고 후 깔림)
+function patternFloor(dt){
+  boss.patternPhase += dt;
+  if(boss.patternPhase >= 38){
+    boss.patternPhase = 0;
+    const c = COLOR_KEYS[(Math.random()*3)|0];
+    const x = VW*0.25 + Math.random()*VW*0.4;
+    bossFloors.push({
+      x: x, y: groundY()-VW*0.012,
+      w: VW*0.16, h: VW*0.012,
+      color: c,
+      warning: 30, // 30프레임 경고
+      active: 0,
+      vx: -VW*0.005 * (1 + speedMul*0.1)
+    });
+  }
+}
+function updateBossFloors(dt){
+  for(let i=bossFloors.length-1;i>=0;i--){
+    const f = bossFloors[i];
+    if(f.warning > 0){
+      f.warning -= dt;
+      if(f.warning <= 0){ f.active = 80; }
+    } else if(f.active > 0){
+      f.active -= dt;
+      f.x += f.vx * dt;
+      if(f.active <= 0){ bossFloors.splice(i,1); continue; }
+      // 플레이어 충돌 (지상이고 같은 색이 아니면 피격)
+      if(player.invuln <= 0 && player.onGround && rectHit(f, player)){
+        if(f.color === activeColor){
+          // 공명 → 안전
+        } else {
+          hit();
+        }
+      }
+    }
+  }
+}
+
+// 패턴 4 : 부채꼴 탄막 (5발, 양끝 검은 탄)
+function patternFan(dt){
+  boss.patternPhase += dt;
+  if(boss.patternPhase >= 36){
+    boss.patternPhase = 0;
+    const cx = boss.x + boss.w/2, cy = boss.y + boss.h/2;
+    const tx = player.x + player.w/2, ty = player.y + player.h/2;
+    const baseA = Math.atan2(ty-cy, tx-cx);
+    const sp = VW*0.0075 * (1 + speedMul*0.1);
+    const mainC = COLOR_KEYS[(Math.random()*3)|0];
+    for(let i=-2;i<=2;i++){
+      const a = baseA + i*0.18;
+      const isEdge = (i===-2 || i===2);
+      const c = isEdge ? 'black' : mainC;
+      bossBullets.push({
+        x:cx, y:cy, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+        r:VW*0.020, color:c
+      });
+    }
+  }
+}
+
+// 패턴 5 : 솟아오르는 흑색 가시 (점프 회피)
+// — 평지의 spike 장애물을 보스전 오른쪽에서 왼쪽으로 흘려보냄
+function patternSpike(dt){
+  boss.patternPhase += dt;
+  if(boss.patternPhase >= 32){
+    boss.patternPhase = 0;
+    const h = VW*0.045;
+    obstacles.push({
+      type:'spike',
+      x: VW+20, y: groundY()-h, w: VW*0.034, h:h,
+      bossPattern: true,   // 보스 패턴 출처 마킹 (이속 영향 분리)
+    });
+  }
+}
+
+// 패턴 6 : 머리 높이로 날아오는 흑색 덩어리 (슬라이드 회피)
+function patternAir(dt){
+  boss.patternPhase += dt;
+  if(boss.patternPhase >= 36){
+    boss.patternPhase = 0;
+    const w = VW*0.06, h = VW*0.04;
+    obstacles.push({
+      type:'air',
+      x: VW+20, y: groundY()-VW*0.10, w:w, h:h,
+      bossPattern: true,
+    });
+  }
+}
+
+function updateBossBullets(dt){
+  for(let i=bossBullets.length-1;i>=0;i--){
+    const b = bossBullets[i];
+    b.x += b.vx*dt; b.y += b.vy*dt;
+    if(b.x < -50 || b.x > VW+50 || b.y < -50 || b.y > VH+50){
+      bossBullets.splice(i,1); continue;
+    }
+    // 플레이어 충돌
+    if(player.invuln <= 0){
+      const px = player.x + player.w/2, py = player.y + player.h/2;
+      const d = Math.hypot(b.x - px, b.y - py);
+      if(d < b.r + player.w*0.45){
+        if(b.color !== 'black' && b.color === activeColor){
+          // 패링 성공 → 보스에게 직접 딜!
+          const dmg = 2 + Math.floor(waveLvl) + Math.floor(speedMul*1.5);
+          boss.hp -= dmg;
+          score += 15;
+          combo++; maxCombo = Math.max(maxCombo, combo); showCombo();
+          chargeSkillGauge(15);
+          emitWave(px, py, b.color);
+          addFloat(boss.x + boss.w/2, boss.y + boss.h*0.3, '-'+dmg, '#ffe066');
+          addParticles(b.x, b.y, COLORS[b.color], 10, 4);
+          bossBullets.splice(i,1);
+          if(boss.hp <= 0){ endBoss(true); return; }
+          continue;
+        } else {
+          // 검은 탄 또는 색 불일치 → 피격
+          hit();
+          addParticles(b.x, b.y, b.color==='black'?'#000':'#ff3b4e', 12, 4);
+          bossBullets.splice(i,1);
+          continue;
+        }
+      }
+    }
+  }
+  // 음파-탄 충돌
+  for(const w of waves){
+    for(let i=bossBullets.length-1;i>=0;i--){
+      const b = bossBullets[i];
+      if(b.color === 'black') continue;
+      const d = Math.hypot(b.x - w.x, b.y - w.y);
+      if(d < w.r && d > w.r - VW*0.06 && b.color === w.color){
+        const dmg = 1 + Math.floor(waveLvl*0.5);
+        boss.hp -= dmg;
+        addParticles(b.x, b.y, COLORS[b.color], 6, 3);
+        bossBullets.splice(i,1);
+        if(boss.hp <= 0){ endBoss(true); return; }
+      }
+    }
+  }
+}
+
+function drawBoss(){
+  if(!boss) return;
+  // 등장 슬라이드: enterAnim 1→0
+  const offX = boss.enterAnim * VW*0.4;
+  const bx = boss.x + offX;
+  const by = boss.y + Math.sin(boss.bob)*8;
+  const bw = boss.w, bh = boss.h;
+
+  // 그림자
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,.25)';
+  ctx.beginPath();
+  ctx.ellipse(bx+bw/2, groundY()+6, bw*0.5, 8, 0, 0, 7);
+  ctx.fill();
+  // 몸체
+  ctx.shadowColor = boss.color; ctx.shadowBlur = 24;
+  const g = ctx.createRadialGradient(bx+bw*0.35, by+bh*0.35, 4, bx+bw/2, by+bh/2, bw/2);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(0.4, boss.color); g.addColorStop(1, shade(boss.color,-40));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(bx+bw/2, by+bh/2, bw/2, bh/2, 0, 0, 7);
+  ctx.fill();
+  ctx.shadowBlur=0;
+  // 눈
+  ctx.fillStyle='#1a1a1a';
+  const ey = by + bh*0.42;
+  ctx.beginPath(); ctx.arc(bx+bw*0.38, ey, bw*0.05, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(bx+bw*0.62, ey, bw*0.05, 0, 7); ctx.fill();
+  // 화난 입
+  ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=3; ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.arc(bx+bw/2, by+bh*0.72, bw*0.13, 1.1*Math.PI, 1.9*Math.PI);
+  ctx.stroke();
+  ctx.restore();
+
+  // 보스 HP 바
+  const barW = VW*0.5, barH = 18;
+  const bxh = (VW - barW)/2, byh = VH*0.06;
+  ctx.fillStyle='rgba(0,0,0,.6)';
+  roundRect(bxh-3, byh-3, barW+6, barH+6, 6); ctx.fill();
+  ctx.fillStyle='#333';
+  roundRect(bxh, byh, barW, barH, 4); ctx.fill();
+  const ratio = Math.max(0, boss.hp / boss.maxHp);
+  const fillG = ctx.createLinearGradient(bxh, 0, bxh+barW, 0);
+  fillG.addColorStop(0, '#ff3b4e'); fillG.addColorStop(1, '#ff7a18');
+  ctx.fillStyle = fillG;
+  roundRect(bxh, byh, barW*ratio, barH, 4); ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(boss.name + '  ' + Math.max(0,boss.hp) + ' / ' + boss.maxHp, VW/2, byh+13);
+
+  // === 스킬 게이지 바 (HP 바 바로 아래) ===
+  const sbW = barW*0.7, sbH = 10;
+  const sbx = (VW - sbW)/2, sby = byh + barH + 6;
+  ctx.fillStyle = 'rgba(0,0,0,.5)';
+  roundRect(sbx-2, sby-2, sbW+4, sbH+4, 4); ctx.fill();
+  ctx.fillStyle = '#222';
+  roundRect(sbx, sby, sbW, sbH, 3); ctx.fill();
+  // 활성 색으로 채워지는 게이지
+  const sRatio = boss.skillGauge / 100;
+  const skillG = ctx.createLinearGradient(sbx, 0, sbx+sbW, 0);
+  const ac = COLORS[activeColor];
+  skillG.addColorStop(0, ac); skillG.addColorStop(1, '#ffffff');
+  ctx.fillStyle = skillG;
+  // 가득 차면 깜빡임
+  if(boss.skillGauge >= 100){
+    ctx.globalAlpha = 0.6 + Math.sin(frame*0.4)*0.4;
+  }
+  roundRect(sbx, sby, sbW*sRatio, sbH, 3); ctx.fill();
+  ctx.globalAlpha = 1;
+  // 라벨
+  ctx.fillStyle='#fff';
+  ctx.font = 'bold 10px sans-serif';
+  ctx.fillText('스킬 게이지  ' + Math.floor(boss.skillGauge) + ' / 100', VW/2, sby + sbH/2 + 3);
+  ctx.textAlign = 'left';
+
+  // 스킬 발동 중이면 화면 가장자리 색 글로우
+  if(boss.skillCasting > 0){
+    const intensity = Math.min(1, boss.skillCasting / 40);
+    const flashG = ctx.createRadialGradient(VW/2, VH/2, VW*0.3, VW/2, VH/2, VW*0.8);
+    flashG.addColorStop(0, hexToRgba(ac, 0));
+    flashG.addColorStop(1, hexToRgba(ac, 0.4 * intensity));
+    ctx.fillStyle = flashG;
+    ctx.fillRect(0,0,VW,VH);
+  }
+}
+
+function drawBossBullets(){
+  for(const b of bossBullets){
+    // 색 키를 실제 hex로 변환 ('red'→'#ffce3a' 같은 식). 'black'은 그대로 검정 처리
+    const hex = (b.color === 'black') ? '#1a1a1a' : (COLORS[b.color] || '#ffffff');
+    ctx.save();
+    ctx.shadowColor = hex; ctx.shadowBlur = 12;
+    const g = ctx.createRadialGradient(b.x-b.r*0.3, b.y-b.r*0.3, 1, b.x, b.y, b.r);
+    g.addColorStop(0,'#fff'); g.addColorStop(0.5, hex); g.addColorStop(1, shade(hex,-40));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function hit(){
+  if(!player || player.invuln>0) return;
+  lives--;
+  combo = 0;
+  player.invuln = 60;
+  speedMul = Math.max(1.0, speedMul - 0.25); // 피격 시 속도 일부 후퇴
+  updateLives();
+  hideCombo();
+  // 화면 흔들림 효과는 단순화
+  addParticles(player.x+player.w/2, player.y+player.h/2, '#ff3b4e', 14, 5);
+  if(lives <= 0) gameOver();
+}
+
+// ---------- 렌더 ----------
+function drawBackground(){
+  if(state === 'boss' && boss){
+    drawBossRoom();
+    return;
+  }
+  drawFieldBackground();
+}
+
+function drawFieldBackground(){
+  // 하늘 그라데이션
+  const g = ctx.createLinearGradient(0,0,0,VH);
+  g.addColorStop(0, '#fef3c7'); g.addColorStop(0.7, '#fde68a'); g.addColorStop(1, '#bef264');
+  ctx.fillStyle = g; ctx.fillRect(0,0,VW,VH);
+
+  // 구름들
+  const cloudShift = (frame*0.5) % (VW+200);
+  ctx.fillStyle = 'rgba(255,255,255,.7)';
+  for(let i=0;i<4;i++){
+    const x = ((i*VW*0.35) + VW - cloudShift) % (VW+200) - 100;
+    const y = VH*0.12 + Math.sin(i*1.3)*VH*0.04;
+    ctx.beginPath();
+    ctx.ellipse(x, y, VW*0.06, VW*0.025, 0, 0, 7);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x+VW*0.04, y+VW*0.005, VW*0.04, VW*0.018, 0, 0, 7);
+    ctx.fill();
+  }
+
+  // 멀리 산
+  const mShift = (frame * speedMul * 0.3) % VW;
+  ctx.fillStyle = 'rgba(120,170,90,.4)';
+  for(let i=0;i<3;i++){
+    const x = (i*VW*0.5 + VW - mShift) % (VW*1.5) - VW*0.25;
+    ctx.beginPath();
+    ctx.moveTo(x, groundY());
+    ctx.lineTo(x+VW*0.18, groundY()-VW*0.10);
+    ctx.lineTo(x+VW*0.36, groundY());
+    ctx.closePath(); ctx.fill();
+  }
+
+  // 바닥 (헤네시스 잔디)
+  ctx.fillStyle = '#65a30d';
+  ctx.fillRect(0, groundY(), VW, VH-groundY());
+  ctx.fillStyle = '#84cc16';
+  ctx.fillRect(0, groundY(), VW, 6);
+  // 잔디 디테일
+  const gShift = (frame * speedMul * 1.5) % 40;
+  ctx.strokeStyle = 'rgba(255,255,255,.25)';
+  ctx.lineWidth = 1;
+  for(let i=0;i<25;i++){
+    const x = (i*40 - gShift) % VW;
+    ctx.beginPath();
+    ctx.moveTo(x, groundY()+8);
+    ctx.lineTo(x-3, groundY()+14);
+    ctx.stroke();
+  }
+}
+
+function drawBossRoom(){
+  // 어두운 보스룸 — 평지와 완전히 다른 톤
+  const g = ctx.createLinearGradient(0,0,0,VH);
+  g.addColorStop(0, '#1a1028'); g.addColorStop(0.6, '#2a1a3a'); g.addColorStop(1, '#3a2840');
+  ctx.fillStyle = g; ctx.fillRect(0,0,VW,VH);
+
+  // 별/먼지 효과
+  ctx.fillStyle = 'rgba(255,255,255,.15)';
+  for(let i=0;i<25;i++){
+    const x = (i*97 + frame*0.3) % VW;
+    const y = (i*53) % (VH*0.6);
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  // 멀리 어두운 산 윤곽
+  ctx.fillStyle = 'rgba(20,10,30,.6)';
+  for(let i=0;i<3;i++){
+    const x = i*VW*0.4 - VW*0.1;
+    ctx.beginPath();
+    ctx.moveTo(x, groundY());
+    ctx.lineTo(x+VW*0.2, groundY()-VW*0.12);
+    ctx.lineTo(x+VW*0.4, groundY());
+    ctx.closePath(); ctx.fill();
+  }
+
+  // 보스룸 바닥 (돌)
+  ctx.fillStyle = '#2a1a2a';
+  ctx.fillRect(0, groundY(), VW, VH-groundY());
+  // 바닥 테두리 (와인레드 라인)
+  ctx.fillStyle = '#AD0E37';
+  ctx.fillRect(0, groundY(), VW, 3);
+  ctx.fillStyle = 'rgba(173,14,55,.3)';
+  ctx.fillRect(0, groundY()+3, VW, 8);
+
+  // 페이드 인 오버레이
+  if(boss && boss.fadeIn > 0){
+    ctx.fillStyle = `rgba(0,0,0,${boss.fadeIn})`;
+    ctx.fillRect(0,0,VW,VH);
+  }
+}
+
+function drawBossWalls(){
+  for(const w of bossWalls){
+    const c = COLORS[w.color];
+    ctx.save();
+    ctx.shadowColor = c; ctx.shadowBlur = 14;
+    const g = ctx.createLinearGradient(w.x, w.y, w.x, w.y+w.h);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, c); g.addColorStop(1, shade(c,-40));
+    ctx.fillStyle = g;
+    ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.restore();
+  }
+}
+
+function drawBossFloors(){
+  for(const f of bossFloors){
+    const c = COLORS[f.color];
+    if(f.warning > 0){
+      // 경고 표시 (점멸 + 외곽)
+      const blink = Math.floor(frame/4)%2 === 0;
+      ctx.save();
+      ctx.globalAlpha = blink ? 0.7 : 0.3;
+      ctx.fillStyle = c;
+      ctx.fillRect(f.x, groundY()-2, f.w, 2);
+      // 점선 외곽
+      ctx.strokeStyle = c;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6,4]);
+      ctx.strokeRect(f.x, groundY()-VW*0.012, f.w, VW*0.012);
+      ctx.setLineDash([]);
+      ctx.restore();
+    } else if(f.active > 0){
+      // 실제 장판
+      ctx.save();
+      ctx.shadowColor = c; ctx.shadowBlur = 10;
+      const g = ctx.createLinearGradient(f.x, f.y, f.x, f.y+f.h);
+      g.addColorStop(0, c); g.addColorStop(1, shade(c,-30));
+      ctx.fillStyle = g;
+      ctx.fillRect(f.x, f.y, f.w, f.h);
+      // 위쪽 빛
+      ctx.fillStyle = 'rgba(255,255,255,.4)';
+      ctx.fillRect(f.x, f.y, f.w, 2);
+      ctx.restore();
+    }
+  }
+}
+
+function drawObstacles(){
+  for(const o of obstacles){
+    if(o.type === 'color'){
+      const c = COLORS[o.color];
+      // 크리스탈/색 결정 느낌
+      ctx.save();
+      ctx.shadowColor = c; ctx.shadowBlur = 14;
+      const g = ctx.createLinearGradient(o.x, o.y, o.x, o.y+o.h);
+      g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, c); g.addColorStop(1, shade(c,-40));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(o.x+o.w/2, o.y);
+      ctx.lineTo(o.x+o.w, o.y+o.h*0.3);
+      ctx.lineTo(o.x+o.w*0.85, o.y+o.h);
+      ctx.lineTo(o.x+o.w*0.15, o.y+o.h);
+      ctx.lineTo(o.x, o.y+o.h*0.3);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    } else if(o.type === 'spike'){
+      ctx.fillStyle = '#0a0a14';
+      ctx.beginPath();
+      ctx.moveTo(o.x+o.w/2, o.y);
+      ctx.lineTo(o.x+o.w, o.y+o.h);
+      ctx.lineTo(o.x, o.y+o.h);
+      ctx.closePath(); ctx.fill();
+      // 빨간 위험 표시
+      ctx.fillStyle='rgba(255,80,80,.7)';
+      ctx.fillRect(o.x, o.y+o.h-3, o.w, 3);
+    } else if(o.type === 'air'){
+      ctx.fillStyle = '#0a0a14';
+      // 떠 있는 검은 덩어리 + 아래 ▼
+      ctx.beginPath();
+      ctx.ellipse(o.x+o.w/2, o.y+o.h/2, o.w/2, o.h/2, 0, 0, 7);
+      ctx.fill();
+      ctx.fillStyle='#ff3b4e';
+      ctx.beginPath();
+      ctx.moveTo(o.x+o.w/2-6, o.y+o.h+2);
+      ctx.lineTo(o.x+o.w/2+6, o.y+o.h+2);
+      ctx.lineTo(o.x+o.w/2, o.y+o.h+10);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+}
+
+function drawMobs(){
+  for(const m of mobs){
+    const bobY = Math.sin(m.bob)*3;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.2)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 4;
+    // 몸체
+    const g = ctx.createRadialGradient(m.x+m.w*0.35, m.y+m.h*0.35+bobY, 2, m.x+m.w/2, m.y+m.h/2+bobY, m.w/2);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.4, m.color); g.addColorStop(1, shade(m.color,-30));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(m.x+m.w/2, m.y+m.h/2+bobY, m.w/2, m.h/2, 0, 0, 7);
+    ctx.fill();
+    ctx.restore();
+    // 눈 두 개
+    ctx.fillStyle = '#1a1a1a';
+    const ey = m.y+m.h*0.45 + bobY;
+    ctx.beginPath(); ctx.arc(m.x+m.w*0.38, ey, 2, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(m.x+m.w*0.62, ey, 2, 0, 7); ctx.fill();
+  }
+}
+
+function drawWaves(){
+  for(const w of waves){
+    const hex = COLORS[w.color] || '#ffffff';
+    const a = Math.max(0, w.life);
+    ctx.save();
+    // 바깥 링
+    ctx.strokeStyle = hex;
+    ctx.globalAlpha = a*0.7;
+    ctx.lineWidth = VW * CONFIG.waveThickness * (1+waveLvl*0.08);
+    ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, 7); ctx.stroke();
+    // 안쪽 글로
+    ctx.globalAlpha = a*0.25;
+    ctx.lineWidth = VW*0.04;
+    ctx.beginPath(); ctx.arc(w.x, w.y, w.r*0.9, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawPlayer(){
+  if(!player) return;
+  const {x,y,w,h} = player;
+  const cx = x + w/2, cy = y + h/2;
+  const c = COLORS[activeColor]; // 현재 활성 색 hex
+
+  ctx.save();
+  if(player.invuln>0 && Math.floor(frame/4)%2===0) ctx.globalAlpha = 0.4;
+
+  // 그림자
+  ctx.fillStyle = 'rgba(0,0,0,.25)';
+  ctx.beginPath();
+  ctx.ellipse(cx, groundY()+4, w*0.45, 4, 0, 0, 7);
+  ctx.fill();
+
+  // === 색 보호막 (캐릭터 주변 원형 글로우) ===
+  // 바깥 부드러운 헤일로 (펄스)
+  const pulse = 1 + Math.sin(frame*0.12)*0.06;
+  const haloR = w*0.95 * pulse;
+  const haloG = ctx.createRadialGradient(cx, cy, w*0.4, cx, cy, haloR);
+  haloG.addColorStop(0, hexToRgba(c, 0));
+  haloG.addColorStop(0.55, hexToRgba(c, 0.18));
+  haloG.addColorStop(1, hexToRgba(c, 0));
+  ctx.fillStyle = haloG;
+  ctx.beginPath();
+  ctx.arc(cx, cy, haloR, 0, 7);
+  ctx.fill();
+  // 가까운 보호막 링
+  ctx.strokeStyle = c;
+  ctx.globalAlpha = 0.7;
+  ctx.lineWidth = 3;
+  ctx.shadowColor = c; ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(cx, cy, w*0.72, 0, 7);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+
+  // === 캐릭터 본체 — 중립 톤 (색 변경 안 함) ===
+  const bodyG = ctx.createLinearGradient(x, y, x, y+h);
+  bodyG.addColorStop(0, '#ffffff'); bodyG.addColorStop(0.5, '#f5f3ed'); bodyG.addColorStop(1, '#d4cfbe');
+  ctx.fillStyle = bodyG;
+  roundRect(x, y, w, h, 6); ctx.fill();
+  // 본체 외곽 (활성 색으로 살짝 강조)
+  ctx.strokeStyle = c;
+  ctx.lineWidth = 2;
+  roundRect(x, y, w, h, 6); ctx.stroke();
+
+  // 눈
+  ctx.fillStyle = '#1a1a1a';
+  const ey = y + h*0.4;
+  ctx.beginPath(); ctx.arc(x+w*0.35, ey, w*0.07, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+w*0.65, ey, w*0.07, 0, 7); ctx.fill();
+  // 입
+  ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2; ctx.lineCap='round';
+  ctx.beginPath();
+  if(speedMul > 1.8){
+    ctx.arc(x+w/2, y+h*0.62, w*0.13, 0.1*Math.PI, 0.9*Math.PI);
+  } else {
+    ctx.moveTo(x+w*0.4, y+h*0.65);
+    ctx.lineTo(x+w*0.6, y+h*0.65);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.life -= 0.025;
+    if(p.life<=0){ particles.splice(i,1); continue; }
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life;
+    ctx.fillRect(p.x-2, p.y-2, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+  // floats
+  for(let i=floats.length-1;i>=0;i--){
+    const f = floats[i];
+    f.y -= 1.2; f.life -= 0.022;
+    if(f.life<=0){ floats.splice(i,1); continue; }
+    ctx.fillStyle = f.color;
+    ctx.globalAlpha = f.life;
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(f.txt, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---------- 유틸 ----------
+function shade(hex, amt){
+  let h = hex.replace('#','');
+  let n = parseInt(h,16);
+  let r = Math.max(0,Math.min(255,(n>>16)+amt));
+  let g = Math.max(0,Math.min(255,((n>>8)&255)+amt));
+  let b = Math.max(0,Math.min(255,(n&255)+amt));
+  return 'rgb('+r+','+g+','+b+')';
+}
+function hexToRgba(hex, alpha){
+  let h = hex.replace('#','');
+  let n = parseInt(h,16);
+  let r = (n>>16)&255, g = (n>>8)&255, b = n&255;
+  if(isNaN(n)) return 'rgba(255,255,255,'+alpha+')';
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+
+// ---------- 초월자 펫 ----------
+// 빛(red 키, 금색) / 시간(blue) / 생명(green) — 활성 색의 펫이 캐릭터 가까이, 나머지는 뒤에
+const PET_INFO = {
+  red:   { hex:'#ffce3a', name:'빛',   shape:'beam'   },  // 빛 — 광선 모양
+  blue:  { hex:'#3a86ff', name:'시간', shape:'clock'  },  // 시간 — 작은 시계
+  green: { hex:'#3be07a', name:'생명', shape:'leaf'   },  // 생명 — 나뭇잎
+};
+// 색 전환 직후의 부드러운 팝 애니메이션
+let lastActiveColor = 'red';
+let petPopFrame = 0;
+function drawPets(){
+  if(!player) return;
+  // 활성 색 변경 감지 → 팝 트리거
+  if(activeColor !== lastActiveColor){
+    petPopFrame = frame;
+    lastActiveColor = activeColor;
+  }
+  const cx = player.x + player.w/2, cy = player.y + player.h/2;
+  const info = PET_INFO[activeColor];
+  if(!info) return;
+  // 팝 효과: 색 바뀐 직후 12프레임 동안 살짝 커졌다 줄어듦
+  const since = frame - petPopFrame;
+  const popScale = since < 12 ? 1 + (1 - since/12)*0.35 : 1;
+  // 위치: 캐릭터 좌상단 뒤
+  const ox = -player.w*0.95 - Math.sin(frame*0.08)*4;
+  const oy = -player.h*0.5 + Math.sin(frame*0.12)*5;
+  const size = player.w*0.42 * popScale;
+  drawPet(cx + ox, cy + oy, size, info, 1, true);
+}
+function drawPet(px, py, size, info, alpha, isActive){
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // 글로우
+  if(isActive){
+    const glowG = ctx.createRadialGradient(px, py, size*0.2, px, py, size*1.6);
+    glowG.addColorStop(0, hexToRgba(info.hex, 0.35));
+    glowG.addColorStop(1, hexToRgba(info.hex, 0));
+    ctx.fillStyle = glowG;
+    ctx.beginPath(); ctx.arc(px, py, size*1.6, 0, 7); ctx.fill();
+  }
+  // 몸체 (모양별 다르게)
+  ctx.shadowColor = info.hex; ctx.shadowBlur = isActive ? 14 : 6;
+  const g = ctx.createRadialGradient(px - size*0.25, py - size*0.25, 1, px, py, size);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.5, info.hex);
+  g.addColorStop(1, shade(info.hex, -40));
+  ctx.fillStyle = g;
+  if(info.shape === 'beam'){
+    // 빛 — 별 모양 (네 갈래)
+    ctx.beginPath();
+    const rOut = size, rIn = size*0.4;
+    for(let i=0;i<8;i++){
+      const a = i*Math.PI/4 - Math.PI/2;
+      const r = (i%2===0) ? rOut : rIn;
+      const ex = px + Math.cos(a)*r, ey = py + Math.sin(a)*r;
+      if(i===0) ctx.moveTo(ex, ey); else ctx.lineTo(ex, ey);
+    }
+    ctx.closePath(); ctx.fill();
+  } else if(info.shape === 'clock'){
+    // 시간 — 원 + 시계바늘
+    ctx.beginPath(); ctx.arc(px, py, size, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = Math.max(1.5, size*0.12);
+    ctx.lineCap = 'round';
+    const ang = frame * 0.05;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + Math.cos(ang)*size*0.55, py + Math.sin(ang)*size*0.55);
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + Math.cos(ang*0.3)*size*0.4, py + Math.sin(ang*0.3)*size*0.4);
+    ctx.stroke();
+  } else {
+    // 생명 — 나뭇잎 (이파리 형태)
+    ctx.beginPath();
+    ctx.ellipse(px, py, size, size*0.7, Math.PI/4, 0, 7);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // 줄기
+    ctx.strokeStyle = shade(info.hex, -60);
+    ctx.lineWidth = Math.max(1, size*0.1);
+    ctx.beginPath();
+    ctx.moveTo(px - size*0.5, py + size*0.5);
+    ctx.lineTo(px + size*0.5, py - size*0.5);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+// ---------- HUD ----------
+function updateHUD(){
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('killNum').textContent = kills;
+  const sEl = document.getElementById('speed');
+  sEl.querySelector('b').textContent = kills;
+  sEl.firstChild.textContent = 'SPD ×'+speedMul.toFixed(2)+' ';
+}
+function updateLives(){
+  const hs = document.querySelectorAll('#lives .heart');
+  hs.forEach((h,i)=> h.classList.toggle('off', i>=lives));
+}
+let comboHideTimer = 0;
+function showCombo(){
+  const el = document.getElementById('combo');
+  el.textContent = '콤보 ×'+combo;
+  el.classList.add('show','pop');
+  setTimeout(()=>el.classList.remove('pop'), 150);
+  comboHideTimer = 60;
+}
+function hideCombo(){
+  document.getElementById('combo').classList.remove('show');
+}
+function bigText(txt){
+  const el = document.getElementById('bigText');
+  el.textContent = txt;
+  el.style.transition = 'none';
+  el.style.transform = 'translate(-50%,-50%) scale(0.6)';
+  el.style.opacity = '0';
+  requestAnimationFrame(()=>{
+    el.style.transition = 'all .4s cubic-bezier(.2,1,.3,1)';
+    el.style.transform = 'translate(-50%,-50%) scale(1.1)';
+    el.style.opacity = '1';
+    setTimeout(()=>{
+      el.style.transition = 'all .5s ease-out';
+      el.style.opacity = '0';
+      el.style.transform = 'translate(-50%,-50%) scale(1.3)';
+    }, 700);
+  });
+}
+
+// ---------- 메인 루프 ----------
+let last = performance.now();
+function loop(now){
+  const dt = Math.min((now-last)/16.67, 2); last = now;
+  frame++;
+  try {
+    ctx.clearRect(0,0,VW,VH);
+    drawBackground();
+    if(state === 'run'){
+      spawnLogic(dt);
+      updatePlayer(dt);
+      updateObstacles(dt);
+      updateMobs(dt);
+      updateWaves(dt);
+      // 점수: 살아있는 매 프레임 약간씩
+      score += Math.floor(dt * speedMul * 0.3);
+      if(comboHideTimer > 0){ comboHideTimer -= dt; if(comboHideTimer<=0){ combo = Math.max(0, combo-1); if(combo<=0) hideCombo(); else { showCombo(); } } }
+
+      // 구간 종료 → 보스 진입 흐름
+      if(runEnding && bossIntro <= 0){
+        // 화면이 거의 비고 충분히 지나면 보스 인트로 시작
+        if(obstacles.length === 0 && mobs.length === 0){
+          startBossIntro();
+        }
+      }
+      if(bossIntro > 0){
+        bossIntro -= dt;
+        if(bossIntro <= 0){
+          runEnding = false;
+          spawnBoss();
+        }
+      }
+      updateHUD();
+    } else if(state === 'boss'){
+      updatePlayer(dt);
+      updateObstacles(dt);   // 보스가 던지는 spike/air 장애물 흐르게
+      updateWaves(dt);
+      updateBoss(dt);
+      score += Math.floor(dt * 0.5);
+      if(comboHideTimer > 0){ comboHideTimer -= dt; if(comboHideTimer<=0){ combo = Math.max(0, combo-1); if(combo<=0) hideCombo(); else { showCombo(); } } }
+      updateHUD();
+    }
+    drawMobs();
+    drawObstacles();
+    drawBossFloors();
+    drawWaves();
+    drawBossWalls();
+    drawBossBullets();
+    drawBoss();
+    drawPets();
+    drawPlayer();
+    drawParticles();
+
+    // 보스 진입 페이드 오버레이 — 평지에서 부드럽게 어두워졌다가 보스 무대로
+    if(bossIntro > 0){
+      const t = 1 - (bossIntro / 90);   // 0 → 1
+      const alpha = Math.min(1, t * 1.4); // 빠르게 검정으로
+      ctx.fillStyle = `rgba(0,0,0,${alpha*0.85})`;
+      ctx.fillRect(0,0,VW,VH);
+    }
+  } catch(e){
+    ctx.save();
+    ctx.fillStyle='rgba(255,80,80,.9)'; ctx.font="13px monospace";
+    ctx.fillText('ERR: '+(e.message||e), 12, VH-12);
+    ctx.restore();
+  }
+  requestAnimationFrame(loop);
+}
+
+// ---------- 게임 시작/종료 ----------
+function startGame(){
+  state='run';
+  score=0; lives=3; kills=0; combo=0; maxCombo=0; maxSpeed=1;
+  speedMul=1.0; waveLvl=0;
+  activeColor='red'; setColor('red');
+  obstacles=[]; mobs=[]; waves=[]; particles=[]; floats=[];
+  boss=null; bossBullets=[]; bossWalls=[]; bossFloors=[]; bossesDefeated=0; nextBossIdx=0;
+  runEnding=false; bossIntro=0;
+  spawnTimerObs=10; spawnTimerMob=5;
+  slideHeld=false;
+  resetPlayer();
+  updateLives(); updateHUD();
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('overScreen').classList.add('hidden');
+  bigText('GO!');
+}
+function gameOver(){
+  state='over';
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('finalKills').textContent = kills;
+  document.getElementById('finalCombo').textContent = maxCombo;
+  document.getElementById('finalSpeed').textContent = maxSpeed.toFixed(2);
+  document.getElementById('overScreen').classList.remove('hidden');
+}
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('restartBtn').addEventListener('click', startGame);
+
+// ---------- 관리자 패널 ----------
+// 슬라이더 정의: [key, label, min, max, step, group]
+const ADMIN_FIELDS = [
+  // 이동·속도
+  ['baseSpeed',         '기본 이동 속도',         2,   12,  0.5, '이동·속도'],
+  ['speedGainPerKill',  '처치당 속도 증가',       0.002, 0.05, 0.002, '이동·속도'],
+  ['maxSpeed',          '속도 누적 상한 (배수)',  1.5, 6,   0.1, '이동·속도'],
+  // 음파
+  ['waveBaseSize',      '음파 시작 크기',         0.02, 0.12, 0.005, '음파'],
+  ['waveMaxSize',       '음파 최대 크기',         0.08, 0.40, 0.01, '음파'],
+  ['waveLvlPerKill',    'N킬마다 위력 +1',       4,    30,  1,    '음파'],
+  ['waveThickness',     '음파 두께',             0.004, 0.030, 0.002, '음파'],
+  // 점프·조작
+  ['jumpPower',         '점프 힘',                0.006, 0.025, 0.001, '점프·조작'],
+  ['gravity',           '중력',                   0.0004, 0.0020, 0.0001, '점프·조작'],
+  ['maxJumps',          '점프 횟수 (1=싱글)',     1,    3,   1,    '점프·조작'],
+  // 스폰
+  ['obstacleSpawnMin',  '장애물 스폰 최소 간격',  10,   60,  2,    '스폰'],
+  ['obstacleSpawnMax',  '장애물 스폰 최대 간격',  30,   120, 5,    '스폰'],
+  ['mobSpawnMin',       '몹 스폰 최소 간격',      6,    40,  2,    '스폰'],
+  ['mobSpawnMax',       '몹 스폰 최대 간격',      14,   80,  4,    '스폰'],
+  ['blackRatio',        '흑색 장애물 비율',       0.0,  0.7, 0.05, '스폰'],
+  // 보스
+  ['bossTrigger1',      '첫 보스 트리거 (킬)',    5,    150, 5,    '보스'],
+  ['bossHpMul',         '보스 HP 배율',           0.3,  3.0, 0.1, '보스'],
+];
+
+function buildAdminPanel(){
+  const body = document.getElementById('adminBody');
+  body.innerHTML = '';
+  let curGroup = '';
+  for(const f of ADMIN_FIELDS){
+    const [key, label, min, max, step, group] = f;
+    if(group !== curGroup){
+      curGroup = group;
+      const h = document.createElement('h4');
+      h.textContent = group;
+      body.appendChild(h);
+    }
+    const row = document.createElement('div');
+    row.className = 'row';
+    const valStr = formatVal(CONFIG[key], step);
+    row.innerHTML = `<label>${label}</label>
+      <input type="range" min="${min}" max="${max}" step="${step}" value="${CONFIG[key]}" data-key="${key}">
+      <span class="val">${valStr}</span>`;
+    body.appendChild(row);
+    const input = row.querySelector('input');
+    const valEl = row.querySelector('.val');
+    input.addEventListener('input', e=>{
+      let v = parseFloat(e.target.value);
+      // maxJumps는 정수
+      if(key === 'maxJumps') v = Math.round(v);
+      CONFIG[key] = v;
+      valEl.textContent = formatVal(v, step);
+      // 보스 트리거는 즉시 재계산
+      if(key === 'bossTrigger1') syncBossTriggers();
+      // maxJumps는 현재 플레이어에게도 즉시 반영
+      if(key === 'maxJumps' && player) player.maxJumps = v;
+    });
+  }
+}
+
+function formatVal(v, step){
+  // step에 따라 소수 자릿수 자동 결정
+  if(step >= 1) return Math.round(v).toString();
+  if(step >= 0.1) return v.toFixed(1);
+  if(step >= 0.01) return v.toFixed(2);
+  if(step >= 0.001) return v.toFixed(3);
+  return v.toFixed(4);
+}
+
+function toggleAdminPanel(){
+  const panel = document.getElementById('adminPanel');
+  panel.classList.toggle('open');
+}
+
+document.getElementById('adminBtn').addEventListener('click', ()=>{
+  buildAdminPanel();
+  toggleAdminPanel();
+});
+document.getElementById('adminClose').addEventListener('click', toggleAdminPanel);
+document.getElementById('adminReset').addEventListener('click', ()=>{
+  CONFIG = Object.assign({}, DEFAULT_CONFIG);
+  syncBossTriggers();
+  if(player) player.maxJumps = CONFIG.maxJumps;
+  buildAdminPanel();
+});
+document.getElementById('adminRestart').addEventListener('click', ()=>{
+  startGame();
+});
+// / 키로 패널 토글
+window.addEventListener('keydown', e=>{
+  if(e.code === 'Slash'){ e.preventDefault(); buildAdminPanel(); toggleAdminPanel(); }
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
